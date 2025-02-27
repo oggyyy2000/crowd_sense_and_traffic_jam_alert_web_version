@@ -133,7 +133,7 @@ const Flight = () => {
               if (disconnect) {
                 disconnect();
               }
-              window.location.href = "/#/ManageFlightData";
+              window.location.hash = "/ManageFlightData";
             },
           });
         }
