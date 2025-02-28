@@ -318,7 +318,7 @@ const Flight = () => {
     ];
 
     return (
-      <div className="absolute z-3 top-40 right-[17px] bg-white opacity-90 rounded-lg shadow p-4 w-40">
+      <div className="absolute z-3 top-40 right-[17px] bg-white border-2 border-red-400 opacity-90 rounded-lg shadow !p-4 w-45">
         <ul className="space-y-3">
           {trafficData.map((item, index) => (
             <li key={index} className="flex items-center">
