@@ -6,10 +6,14 @@ import Webcam from "react-webcam";
 
 import { resetHasShownLostConnectionToServerToast } from "../../utils/customAxios";
 import * as SupervisionStreamingService from "../../APIServices/SupervisionStreamingService.api";
+import * as CheckdeviceService from "../../APIServices/CheckdeviceService.api";
+import * as CheckThreadCamHdmiService from "../../APIServices/CheckThreadCamHdmiService.api";
+
 import {
   postRequestSupervisionStreamingServiceDataType,
   postResponseSupervisionStreamingServiceDataType,
 } from "../../types/APIServices/SupervisionStreamingService.type";
+
 import {
   GISDataType,
   DefectType,
@@ -191,14 +195,35 @@ const Flight = () => {
     setMissionDate(currentDate);
   };
 
-  const handleSubmitSetUpBeforeFly = () => {
+  const handleSubmitSetUpBeforeFly = async () => {
     setHadCompletedSetUpBeforeFly(true);
-    const formData = new FormData();
-    formData.append(
-      "data",
-      JSON.stringify({ implementation_date: missionDate })
-    );
-    getConfirmedDataFromWS(formData);
+    const responseCheckDevice = await CheckdeviceService.getAllData();
+
+    if (responseCheckDevice) {
+      toast.success(String(responseCheckDevice));
+      const responseCheckThreadCamHdmi =
+        await CheckThreadCamHdmiService.getAllData();
+      if (responseCheckThreadCamHdmi) {
+        toast.success(String(responseCheckThreadCamHdmi));
+        const formData = new FormData();
+        formData.append(
+          "data",
+          JSON.stringify({ implementation_date: missionDate })
+        );
+        getConfirmedDataFromWS(formData);
+      } else {
+        setHadCompletedSetUpBeforeFly(false);
+      }
+    } else {
+      setHadCompletedSetUpBeforeFly(false);
+    }
+
+    // const formData = new FormData();
+    // formData.append(
+    //   "data",
+    //   JSON.stringify({ implementation_date: missionDate })
+    // );
+    // getConfirmedDataFromWS(formData);
   };
 
   const sendConfirmedDataToWS = (
