@@ -17,6 +17,7 @@ import {
   Pagination,
   Select,
   TextField,
+  Button,
 } from "@mui/material";
 import Grid from "@mui/material/Grid2";
 
@@ -24,6 +25,7 @@ import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import FolderIcon from "../../assets/images/open_folder.png";
 import MissionIcon from "../../assets/images/mission_drone_icon.svg";
+import CropFreeIcon from "@mui/icons-material/CropFree";
 
 import ImageZoom from "../../components/Zooming/ImageZoom";
 
@@ -50,6 +52,8 @@ const ManageFlightData = () => {
     listImageByMission && listImageByMission.length > 0
       ? Math.ceil(listImageByMission.length / imagesPerPage)
       : 0;
+
+  const [openZoomingImg, setOpenZoomingImg] = useState("");
 
   const location = useLocation();
 
@@ -238,8 +242,22 @@ const ManageFlightData = () => {
                         disabled
                       />
 
+                      <Button
+                        className="!absolute top-[42px] right-0 z-3 !min-w-10 !w-10 
+                        !h-10 !bg-white !border-none rounded-lg"
+                        variant="outlined"
+                        onClick={() =>
+                          setOpenZoomingImg(
+                            import.meta.env.VITE_API_URL + item.image_path
+                          )
+                        }
+                      >
+                        <CropFreeIcon color="action" />
+                      </Button>
                       <ImageZoom
                         info={import.meta.env.VITE_API_URL + item.image_path}
+                        openZoomingImg={openZoomingImg}
+                        setOpenZoomingImg={setOpenZoomingImg}
                       />
 
                       <img
