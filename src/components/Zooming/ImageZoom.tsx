@@ -2,13 +2,18 @@ import { useState, useRef, useEffect } from "react";
 
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import ZoomOutIcon from "@mui/icons-material/ZoomOut";
-import CropFreeIcon from "@mui/icons-material/CropFree";
 
-import { Dialog, Button } from "@mui/material";
+import { Dialog } from "@mui/material";
 
-const ImageZoom = ({ info }: { info: string }) => {
-  const [openZoomingImg, setOpenZoomingImg] = useState("");
-
+const ImageZoom = ({
+  info,
+  openZoomingImg,
+  setOpenZoomingImg,
+}: {
+  info: string;
+  openZoomingImg: string;
+  setOpenZoomingImg: React.Dispatch<React.SetStateAction<string>>;
+}) => {
   console.log("info image: ", info);
   // State for image scale
   const [scale, setScale] = useState(1);
@@ -80,14 +85,6 @@ const ImageZoom = ({ info }: { info: string }) => {
 
   return (
     <>
-      <Button
-        className="!absolute top-[42px] right-0 z-3 !min-w-10 !w-10 
-        !h-10 !bg-white !border-none r!ounded-lg"
-        variant="outlined"
-        onClick={() => setOpenZoomingImg(info)}
-      >
-        <CropFreeIcon color="action" />
-      </Button>
       <Dialog
         open={openZoomingImg === info ? true : false}
         onClose={() => setOpenZoomingImg("")}
