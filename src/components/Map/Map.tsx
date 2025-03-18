@@ -12,7 +12,8 @@ import L from "leaflet";
 
 import DroneIcon from "../../assets/images/drone2.png";
 import ErrorIcon from "../../assets/images/error-icon.png";
-import blueDotIcon from "../../assets/images/blue_dot.png";
+// import blueDotIcon from "../../assets/images/blue_dot.png";
+import CropFreeIcon from "@mui/icons-material/CropFree";
 
 interface MapProps {
   centerMap: {
@@ -22,10 +23,10 @@ interface MapProps {
   zoomMap: number;
   startFly: boolean;
   currentLocation?: GISDataType | null;
-  polylineMap: {
-    lat: number;
-    lng: number;
-  }[];
+  // polylineMap: {
+  //   lat: number;
+  //   lng: number;
+  // }[];
   defectInfo: DefectType[];
   mapCSS: string;
 }
@@ -39,18 +40,20 @@ const Map = ({
   zoomMap,
   startFly,
   currentLocation,
-  polylineMap,
+  // polylineMap,
   defectInfo,
   mapCSS,
 }: MapProps) => {
   const [typeMap, setTypeMap] = useState("roadmap");
   const [buttonText, setButtonText] = useState("Bản đồ");
 
-  console.log("polylineMap: ", polylineMap);
+  // console.log("polylineMap: ", polylineMap);
   const customIcon = new L.Icon({
     iconUrl: DroneIcon,
     iconSize: [30, 30],
   });
+
+  const [fullZoomMapCSS, setFullZoomMapCSS] = useState("");
 
   const handleChangeMapType = () => {
     setButtonText((prevButtonText) =>
@@ -71,26 +74,26 @@ const Map = ({
     return null;
   };
 
-  const renderPolyline = () => {
-    const customIcon = new L.Icon({
-      iconUrl: blueDotIcon,
-      iconSize: [5, 5],
-    });
+  // const renderPolyline = () => {
+  //   const customIcon = new L.Icon({
+  //     iconUrl: blueDotIcon,
+  //     iconSize: [5, 5],
+  //   });
 
-    return (
-      <>
-        {polylineMap.map((gis1, index) => {
-          if (gis1.lat && gis1.lng) {
-            return (
-              <>
-                <Marker key={index} position={gis1} icon={customIcon}></Marker>
-              </>
-            );
-          }
-        })}
-      </>
-    );
-  };
+  //   return (
+  //     <>
+  //       {polylineMap.map((gis1, index) => {
+  //         if (gis1.lat && gis1.lng) {
+  //           return (
+  //             <>
+  //               <Marker key={index} position={gis1} icon={customIcon}></Marker>
+  //             </>
+  //           );
+  //         }
+  //       })}
+  //     </>
+  //   );
+  // };
 
   const renderMarkerError = (defectInfo: DefectType[]) => {
     const customIcon = new L.Icon({
@@ -153,7 +156,7 @@ const Map = ({
     <div
       className={`${
         !startFly ? "h-[calc(100vh-65px)] w-screen relative z-0" : mapCSS
-      }`}
+      } ${fullZoomMapCSS}`}
     >
       <button
         className="absolute z-1 text-center normal-case 
@@ -164,6 +167,20 @@ const Map = ({
         onClick={handleChangeMapType}
       >
         {buttonText}
+      </button>
+
+      <button
+        className="absolute z-1 text-center normal-case 
+        shadow-[rgba(0,0,0,0.3)_0px_1px_4px_-1px] border-0 w-[40px] 
+        h-[40px] p-[10px] right-[16px] top-[10px] shadow-[0_2px_5px_rgba(0,0,0,0.15)] 
+        border-none bg-white rounded-[7px]"
+        onClick={() => {
+          setFullZoomMapCSS((prev) =>
+            prev === "h-[480px] w-[640px]" ? "" : "h-[480px] w-[640px]"
+          );
+        }}
+      >
+        <CropFreeIcon color="action" />
       </button>
 
       <MapContainer
@@ -211,7 +228,7 @@ const Map = ({
           )}
 
         {/* render duong di may bay  */}
-        {polylineMap && polylineMap.length > 0 && renderPolyline()}
+        {/* {polylineMap && polylineMap.length > 0 && renderPolyline()} */}
       </MapContainer>
     </div>
   );
