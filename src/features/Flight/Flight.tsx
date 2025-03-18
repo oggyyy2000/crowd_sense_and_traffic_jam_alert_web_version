@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { useLocation } from "react-router-dom";
 
-import Webcam from "react-webcam";
+// import Webcam from "react-webcam";
 
 import { resetHasShownLostConnectionToServerToast } from "../../utils/customAxios";
 import * as SupervisionStreamingService from "../../APIServices/SupervisionStreamingService.api";
@@ -30,19 +30,29 @@ import {
   DialogActions,
   DialogContent,
   TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import FlightTakeoffIcon from "@mui/icons-material/FlightTakeoff";
 import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import PinDropIcon from "@mui/icons-material/PinDrop";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import Icon from "@mdi/react";
+import { mdiBellAlert } from "@mdi/js";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMapLocationDot } from "@fortawesome/free-solid-svg-icons";
 
 import Map from "../../components/Map/Map";
-import HotKeyManual from "../../components/HotKeyManual/HotKeyManual";
+import axios from "axios";
+import ImageZoom from "../../components/Zooming/ImageZoom";
 
-type PolylineMap = {
-  lat: number;
-  lng: number;
-};
+// type PolylineMap = {
+//   lat: number;
+//   lng: number;
+// };
 
 type MediaDeviceInfo = {
   kind: string;
@@ -58,6 +68,9 @@ const Flight = () => {
     .toString()
     .padStart(2, "0")}-${dt.getDate().toString().padStart(2, "0")}`;
   const [missionDate, setMissionDate] = useState(currentDate);
+  const [flightMethod, setFlightMethod] = useState("");
+  console.log("flightMethod: ", flightMethod);
+  const [videoStreamUrl, setVideoStreamUrl] = useState("");
   const [hadCompletedSetUpBeforeFly, setHadCompletedSetUpBeforeFly] =
     useState(false);
   // const [startFly, setStartFly] = useState(false);
@@ -68,7 +81,7 @@ const Flight = () => {
     lat: 21.002890438729345,
     lng: 105.86171273377768,
   });
-  const [polylineMap, setPolylineMap] = useState<PolylineMap[]>([]);
+  // const [polylineMap, setPolylineMap] = useState<PolylineMap[]>([]);
 
   // info from WS
   const [currentLocation, setCurrentLocation] = useState<GISDataType | null>(
@@ -103,6 +116,9 @@ const Flight = () => {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const location = useLocation();
 
+  // zoom anh defect
+  const [openZoomingImg, setOpenZoomingImg] = useState("");
+
   useEffect(() => {
     resetHasShownLostConnectionToServerToast();
   }, [location]);
@@ -127,8 +143,8 @@ const Flight = () => {
       if (!ws || !ws.current) return;
       ws.current.onmessage = (e: MessageEvent) => {
         const data = JSON.parse(e.data);
+        console.log("endSocketData: ", data);
         if (data.data_state === "supervise_complete") {
-          console.log(data.data);
           toast.success("Đã hoàn thành nhiệm vụ !", {
             onClose: () => {
               if (setStartFly) {
@@ -137,14 +153,31 @@ const Flight = () => {
               if (disconnect) {
                 disconnect();
               }
+              setFlightMethod("");
+              setDefectInfo([]);
+              setObjCount({
+                people: 0,
+                bicycle: 0,
+                car: 0,
+                truck: 0,
+                tricycle: 0,
+                bus: 0,
+                motor: 0,
+              });
+              // setPolylineMap([]);
+              setCurrentLocation(null);
+              setCenterMap({
+                lat: 21.002890438729345,
+                lng: 105.86171273377768,
+              });
               window.location.hash = "/ManageFlightData";
             },
           });
         }
         console.log("data:", data);
-        const gis = data.data.gis;
-        const defectWS = data.data.defects;
-        const objectCountWS = data.data.count_object;
+        const gis = data.metadata.detections.gis;
+        const defectWS = data.metadata.detections.defects;
+        const objectCountWS = data.metadata.detections.count_object;
 
         if (gis !== undefined) {
           if (setStartFly) {
@@ -156,13 +189,13 @@ const Flight = () => {
             lat: parseFloat(gis.latitude),
             lng: parseFloat(gis.longtitude),
           });
-          setPolylineMap((prevPolyline) => [
-            ...prevPolyline,
-            {
-              lat: parseFloat(gis.latitude),
-              lng: parseFloat(gis.longtitude),
-            },
-          ]);
+          // setPolylineMap((prevPolyline) => [
+          //   ...prevPolyline,
+          //   {
+          //     lat: parseFloat(gis.latitude),
+          //     lng: parseFloat(gis.longtitude),
+          //   },
+          // ]);
           setZoomMap(16);
           if (defectWS.length > 0) {
             setDefectInfo(defectWS);
@@ -175,7 +208,7 @@ const Flight = () => {
     } catch (error) {
       console.log("Error from WS: ", error);
     }
-  }, [ws, disconnect, setStartFly, startFly, polylineMap]);
+  }, [ws, disconnect, setStartFly, startFly]);
 
   useEffect(() => {
     if (startFly && defectInfo.length > 0) {
@@ -197,43 +230,54 @@ const Flight = () => {
 
   const handleSubmitSetUpBeforeFly = async () => {
     setHadCompletedSetUpBeforeFly(true);
-    const responseCheckDevice = await CheckdeviceService.getAllData();
+    // const responseCheckDevice = await CheckdeviceService.getAllData();
 
-    if (responseCheckDevice) {
-      toast.success(String(responseCheckDevice));
-      const responseCheckThreadCamHdmi =
-        await CheckThreadCamHdmiService.getAllData();
-      if (responseCheckThreadCamHdmi) {
-        toast.success(String(responseCheckThreadCamHdmi));
-        const formData = new FormData();
-        formData.append(
-          "data",
-          JSON.stringify({ implementation_date: missionDate })
-        );
-        getConfirmedDataFromWS(formData);
-      } else {
-        setHadCompletedSetUpBeforeFly(false);
-      }
+    // if (responseCheckDevice) {
+    // toast.success(String(responseCheckDevice));
+    const responseCheckThreadCamHdmi =
+      await CheckThreadCamHdmiService.getAllData();
+    if (responseCheckThreadCamHdmi) {
+      toast.success(String(responseCheckThreadCamHdmi));
+      const formData = new FormData();
+      formData.append(
+        "data",
+        JSON.stringify({ implementation_date: missionDate })
+      );
+      getConfirmedDataFromWS(formData);
     } else {
       setHadCompletedSetUpBeforeFly(false);
     }
-
-    // const formData = new FormData();
-    // formData.append(
-    //   "data",
-    //   JSON.stringify({ implementation_date: missionDate })
-    // );
-    // getConfirmedDataFromWS(formData);
+    // } else {
+    // setHadCompletedSetUpBeforeFly(false);
+    // }
   };
 
   const sendConfirmedDataToWS = (
     data: postResponseSupervisionStreamingServiceDataType
   ) => {
+    const modifyDataSentToWS = {
+      ...data,
+      action: "resume",
+    };
+    console.log("modifyDataSentToWS: ", modifyDataSentToWS);
+
     if (!ws || !ws.current) return;
-    ws.current.send(JSON.stringify(data));
+    ws.current.send(JSON.stringify(modifyDataSentToWS));
     if (setStartFly) {
       setStartFly(true);
     }
+
+    // TODO
+    try {
+      const response = axios.get("http://localhost:8000/video-stream/", {
+        responseType: "stream",
+      });
+      console.log("response: ", response);
+    } catch (error) {
+      console.log("Error calling video stream API: ", error);
+    }
+    setVideoStreamUrl("http://localhost:8000/video-stream/");
+
     handleCloseSetUpBeforeFly();
   };
 
@@ -249,7 +293,6 @@ const Flight = () => {
       },
     });
     if (response) {
-      console.log("ConfirmedDataFromWS: ", response);
       sendConfirmedDataToWS(response);
     } else {
       setHadCompletedSetUpBeforeFly(false);
@@ -300,6 +343,23 @@ const Flight = () => {
                 onChange={(e) => setMissionDate(e.target.value)}
               />
             </div>
+            <div className="min-h-20 w-54 flex justify-center items-center">
+              <FormControl fullWidth>
+                <InputLabel>Phương thức kiểm tra</InputLabel>
+                <Select
+                  value={flightMethod}
+                  label="Phương thức kiểm tra"
+                  onChange={(e) => setFlightMethod(e.target.value)}
+                  defaultValue={""}
+                >
+                  <MenuItem value="damchay">Phát hiện đám cháy</MenuItem>
+                  <MenuItem value="untac">Phát hiện ùn tắc giao thông</MenuItem>
+                  <MenuItem value="damdongbatthuong">
+                    Phát hiện đám đông bất thường
+                  </MenuItem>
+                </Select>
+              </FormControl>
+            </div>
           </DialogContent>
           <DialogActions
             sx={{
@@ -318,7 +378,7 @@ const Flight = () => {
 
             <Button
               color="primary"
-              disabled={startFly === true ? true : false}
+              disabled={startFly === true || !flightMethod ? true : false}
               onClick={handleSubmitSetUpBeforeFly}
             >
               {hadCompletedSetUpBeforeFly === false
@@ -331,7 +391,7 @@ const Flight = () => {
     );
   };
 
-  const TrafficCount = () => {
+  const ObjectCount = () => {
     const trafficData = [
       { icon: "👤", label: "người", count: objCount && objCount.people },
       { icon: "🚲", label: "xe đạp", count: objCount && objCount.bicycle },
@@ -342,23 +402,86 @@ const Flight = () => {
       { icon: "🏍️", label: "xe máy", count: objCount && objCount.motor },
     ];
 
-    return (
-      <div className="absolute z-3 top-40 right-[17px] bg-white border-2 border-red-400 opacity-90 rounded-lg shadow !p-4 w-45">
-        <ul className="space-y-3">
-          {trafficData.map((item, index) => (
-            <li key={index} className="flex items-center">
-              <span className="w-10 text-2xl mr-2">{item.icon}</span>{" "}
+    const crowdSenseData = {
+      icon: "👤",
+      label: "người",
+      count: objCount && objCount.people,
+    };
+
+    if (flightMethod === "untac") {
+      return (
+        <div
+          className="absolute z-3 top-40 right-[17px] bg-white border-2 
+        border-red-400 opacity-90 rounded-lg shadow !p-4 w-55 flex flex-wrap justify-center"
+        >
+          {/* UN TAC */}
+          {/* <p className="text-lg text-gray-800 text-center">
+            Tình trạng giao thông:{" "}
+            <span className="font-bold text-gray-800">Ùn tắc</span>
+          </p>
+          <div className="w-full h-2 bg-red-500 !my-1"></div> */}
+          {/* LUU THONG CHAM */}
+          <p className="text-lg text-gray-800 text-center">
+            Tình trạng giao thông:{" "}
+            <span className="font-bold text-gray-800">Lưu thông chậm</span>
+          </p>
+          <div className="w-full h-2 bg-yellow-500 !my-1"></div>
+          {/* THONG THOANG */}
+          {/* <p className="text-lg text-gray-800 text-center">
+            Tình trạng giao thông:{" "}
+            <span className="font-bold text-gray-800">Thông thoáng</span>
+          </p>
+          <div className="w-full h-2 bg-green-500 !my-1"></div> */}
+          <ul className="space-y-3">
+            {trafficData.map((item, index) => (
+              <li key={index} className="flex items-center">
+                <span className="w-10 text-2xl mr-2">{item.icon}</span>{" "}
+                {/* Larger icons */}
+                <div>
+                  <p className="font-medium text-gray-800">
+                    {item.label}: {item.count}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    } else if (flightMethod === "damdongbatthuong") {
+      return (
+        <div className="absolute z-3 top-40 right-[17px] bg-white border-2 border-red-400 opacity-90 rounded-lg shadow !p-4 w-45">
+          <ul className="space-y-3">
+            <li className="flex items-center">
+              <span className="w-10 text-2xl mr-2">{crowdSenseData.icon}</span>{" "}
               {/* Larger icons */}
               <div>
                 <p className="font-medium text-gray-800">
-                  {item.label}: {item.count}
+                  {crowdSenseData.label}: {crowdSenseData.count}
                 </p>
               </div>
             </li>
-          ))}
-        </ul>
-      </div>
+          </ul>
+        </div>
+      );
+    } else if (flightMethod === "damchay") {
+      return null;
+    } else {
+      return null;
+    }
+  };
+
+  // TODO
+  const convertCoordinates = async (
+    defectLatitude: number,
+    defectLongtitude: number
+  ) => {
+    const response = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?lat=${defectLatitude}&lon=${defectLongtitude}&format=json`
     );
+    console.log("convertCoordinates: ", response);
+    console.log("convertCoordinatesName: ", response.data.display_name);
+    console.log("convertCoordinatesAddress: ", response.data.address);
+    return response.data.display_name;
   };
 
   const defectList = () => {
@@ -367,7 +490,7 @@ const Flight = () => {
         <div
           className={`absolute z-2 ${
             openDefectList
-              ? "bottom-[calc((100%-64px-60px+210px)/3)] !left-[300px] transition-all duration-500 ease-out"
+              ? "bottom-[calc((100%-64px-60px+210px)/3)] !left-[350px] transition-all duration-500 ease-out"
               : "bottom-[calc((100%-64px-60px+210px)/3)] left-0 transition-all duration-500 ease-in"
           }`}
         >
@@ -384,7 +507,7 @@ const Flight = () => {
         </div>
 
         <div
-          className={`absolute z-1 w-[300px] h-[calc(100%-64px-60px-82px)] 
+          className={`absolute z-1 w-[350px] h-[calc(100%-64px-60px-82px)] 
             bg-white left-0 bottom-[30px] flex flex-col 
             items-center overflow-y-auto rounded-r-[15px] ${
               openDefectList
@@ -392,45 +515,97 @@ const Flight = () => {
                 : "opacity-0"
             }`}
         >
+          <div
+            className="bg-red-500 text-white p-0.25 uppercase 
+                      text-center rounded-lg !mt-5.5 w-[95%] shadow-lg font-bold"
+          >
+            <h1>BẤT THƯỜNG PHÁT HIỆN</h1>
+          </div>
           {defectInfo.length > 0 &&
             defectInfo
               .slice()
               .reverse()
               .map((defect, index) => {
                 console.log(defect);
+                // const convertCoordinatesToExactLocation = convertCoordinates(
+                //   parseFloat(defect.defect_gis.latitude),
+                //   parseFloat(defect.defect_gis.longtitude)
+                // );
                 return (
-                  <>
-                    <div
-                      key={index}
-                      className="!mt-5.5 w-[95%] shadow-lg font-bold bg-white 
+                  <div
+                    key={index}
+                    className="!mt-5.5 w-[95%] shadow-lg font-bold bg-white 
                       text-black rounded-lg"
-                    >
-                      <div
-                        className="bg-red-500 text-white p-0.25 uppercase 
-                      text-center rounded-t-lg"
-                      >
-                        <h1>{defect.defect_name}</h1>
-                      </div>
-                      <div className="p-2.5 uppercase">
-                        <table>
-                          <tr>
-                            <td rowSpan={2} width={"30px"}>
-                              <PinDropIcon style={{ color: "#00C8F8" }} />
-                            </td>
-                            <td>
-                              KD,VD: {parseFloat(defect.defect_gis.latitude)},{" "}
-                              {parseFloat(defect.defect_gis.longtitude)}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td>
-                              ĐỘ CAO: {parseFloat(defect.defect_gis.altitude)}
-                            </td>
-                          </tr>
-                        </table>
-                      </div>
+                  >
+                    <div className="!p-2.5 uppercase">
+                      <table>
+                        <tr>
+                          <td width={"30px"}>
+                            <Icon path={mdiBellAlert} color={"red"} size={1} />
+                          </td>
+                          <td>
+                            <p>{defect.defect_name}</p>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td width={"30px"}>
+                            <PinDropIcon style={{ color: "#00C8F8" }} />
+                          </td>
+                          <td>
+                            KD,VD: {parseFloat(defect.defect_gis.latitude)},{" "}
+                            {parseFloat(defect.defect_gis.longtitude)}
+                          </td>
+                          <td>
+                            <Button
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  `${parseFloat(
+                                    defect.defect_gis.latitude
+                                  )}, ${parseFloat(
+                                    defect.defect_gis.longtitude
+                                  )}`
+                                );
+                                toast.success("Đã copy tọa độ");
+                              }}
+                            >
+                              <ContentCopyIcon />
+                            </Button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td width={"30px"}>
+                            <FontAwesomeIcon
+                              icon={faMapLocationDot}
+                              color="blue"
+                            />
+                          </td>
+                          <td>ĐỊA CHỈ CHI TIẾT: Hà Đông</td>
+                        </tr>
+                      </table>
                     </div>
-                  </>
+                    <div className="text-center !p-2">
+                      <Button
+                        className=""
+                        variant="outlined"
+                        color="success"
+                        onClick={() =>
+                          setOpenZoomingImg(
+                            import.meta.env.VITE_API_URL +
+                              defect.defect_image[0]
+                          )
+                        }
+                      >
+                        Xem ảnh
+                      </Button>
+                      <ImageZoom
+                        info={
+                          import.meta.env.VITE_API_URL + defect.defect_image[0]
+                        }
+                        openZoomingImg={openZoomingImg}
+                        setOpenZoomingImg={setOpenZoomingImg}
+                      />
+                    </div>
+                  </div>
                 );
               })}
         </div>
@@ -445,26 +620,44 @@ const Flight = () => {
         zoomMap={zoomMap}
         startFly={startFly || false}
         currentLocation={currentLocation}
-        polylineMap={polylineMap}
+        // polylineMap={polylineMap}
         defectInfo={defectInfo}
         mapCSS={"h-[195px] w-[400px] absolute z-1 bottom-0 right-0"}
+        // mapCSS={"hidden"} // hien tai dang de an an do khi bay do gps dang kp real gps
       />
 
       {setUpBeforeFly()}
 
       {startFly && defectList()}
 
-      {startFly && devices.length > 0 && (
-        <Webcam
-          className="absolute w-screen h-[calc(100vh-64px)] object-fill z-0"
-          audio={false}
-          autoPlay
+      {startFly && devices.length > 0 && videoStreamUrl && (
+        <img
+          src={videoStreamUrl}
+          alt="Video detect stream"
+          className="w-full h-full"
         />
       )}
 
-      {startFly && <HotKeyManual />}
+      {startFly && (
+        <Button
+          variant="contained"
+          color="warning"
+          sx={{ position: "absolute", top: "70px", left: "15px" }}
+          onClick={() => {
+            const modifyDataSentToWS = {
+              action: "off",
+            };
 
-      {startFly && <TrafficCount />}
+            setVideoStreamUrl("");
+            if (!ws || !ws.current) return;
+            ws.current.send(JSON.stringify(modifyDataSentToWS));
+          }}
+        >
+          Dừng nhiệm vụ
+        </Button>
+      )}
+
+      {startFly && <ObjectCount />}
     </>
   );
 };
