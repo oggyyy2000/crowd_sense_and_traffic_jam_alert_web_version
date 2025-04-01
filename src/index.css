@@ -28,3 +28,19 @@ html {
   line-height: 1.6rem;
   box-sizing: border-box;
 }
+
+@keyframes blink-border {
+  0%, 100% {
+    border-color: transparent;
+  }
+  50% {
+    border-color: red;
+  }
+}
+
+.blink-red-border {
+  border-width: 1px;
+  border-style: solid;
+  animation: blink-border 1s ease-in-out infinite;
+  border-color: red;
+}
