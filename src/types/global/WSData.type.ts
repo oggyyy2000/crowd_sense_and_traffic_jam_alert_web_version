@@ -8,6 +8,7 @@ export interface DefectType {
   defect_id: string;
   defect_name: string;
   defect_gis: GISDataType;
+  defect_location: string;
   defect_image: string[];
 }
 
@@ -25,4 +26,5 @@ export interface DefectDataResponseType {
   gis: GISDataType;
   defects: DefectType[];
   count_object: CountObjectType;
+  label_traffic: string;
 }
