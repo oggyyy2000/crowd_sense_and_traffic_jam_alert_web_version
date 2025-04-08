@@ -1,4 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
+import axios from "axios";
 import { toast } from "react-toastify";
 import { useLocation } from "react-router-dom";
 
@@ -32,21 +33,12 @@ import {
   MenuItem,
 } from "@mui/material";
 import FlightTakeoffIcon from "@mui/icons-material/FlightTakeoff";
-import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
-import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
-import PinDropIcon from "@mui/icons-material/PinDrop";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import Icon from "@mdi/react";
-import { mdiBellAlert } from "@mdi/js";
-import { mdiNewBox } from "@mdi/js";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faMapLocationDot } from "@fortawesome/free-solid-svg-icons";
 import CropFreeIcon from "@mui/icons-material/CropFree";
 
 import Map from "../../components/Map/Map";
-import axios from "axios";
-import ImageZoom from "../../components/Zooming/ImageZoom";
 import Loading from "../../components/LoadingPage/LoadingPage";
+import ObjectCountPanel from "./ObjectCountPanel";
+import DefectListPanel from "./DefectListPanel";
 
 // type PolylineMap = {
 //   lat: number;
@@ -117,22 +109,7 @@ const Flight = () => {
   const { sendMessage, lastMessage, readyState } = useWebSocket(
     import.meta.env.VITE_WS_URL,
     {
-      // onError: (event) => {
-      //   console.log("WebSocket error:", event);
-      // },
-      // onMessage(event) {
-      //   console.log("WebSocket message received:", event);
-      // },
-      // onClose: (event) => {
-      //   console.log("WebSocket closed:", event);
-      //   // Tại đây bạn có thể đọc event.reason (hoặc code) để xác định lỗi phía backend
-      //   toast.error(`Server báo lỗi: ${event.reason}`);
-      // },
       shouldReconnect: () => {
-        // toast.error("Lỗi không gửi được yêu cầu !", {
-        //   autoClose: 4000,
-        //   onClose: () => window.location.reload(),
-        // });
         return true;
       }, // autoreconnect
     }
@@ -161,12 +138,6 @@ const Flight = () => {
   useEffect(() => {
     resetHasShownLostConnectionToServerToast();
   }, [location]);
-
-  // useEffect(() => {
-  //   if (connect) {
-  //     connect();
-  //   }
-  // }, [connect]);
 
   useEffect(() => {
     if (readyState) {
@@ -211,19 +182,24 @@ const Flight = () => {
   useEffect(() => {
     if (!lastMessage) return; // Chưa có tin nhắn
     try {
-      // if (!ws || !ws.current) return;
-      // ws.current.onmessage = (e: MessageEvent) => {
       const data = JSON.parse(lastMessage.data);
       console.log("endSocketData: ", data);
+      if (data.status === "error") {
+        toast.error("Lỗi không gửi được yêu cầu !", {
+          autoClose: 4000,
+          onClose: () => window.location.reload(),
+        });
+        console.error(
+          "Lỗi khi gửi thông tin nhiệm vụ bay vào websocket: ",
+          data.message
+        );
+      }
       if (data.data_state === "supervise_complete") {
         toast.success("Đã hoàn thành nhiệm vụ !", {
           onClose: () => {
             if (setStartFly) {
               setStartFly(false);
             }
-            // if (disconnect) {
-            //   disconnect();
-            // }
             setFlightMethod("");
             setDefectInfo([]);
             setObjCount({
@@ -246,7 +222,6 @@ const Flight = () => {
           },
         });
       }
-      console.log("data:", data);
       if (data && data.metadata && data.metadata.detections) {
         const gis = data.metadata.detections.gis;
         const defectWS = data.metadata.detections.defects;
@@ -464,29 +439,29 @@ const Flight = () => {
 
   const handleSubmitSetUpBeforeFly = async () => {
     setHadCompletedSetUpBeforeFly(true);
-    // const responseCheckDevice = await CheckdeviceService.getAllData();
+    const responseCheckDevice = await CheckdeviceService.getAllData();
 
-    // if (responseCheckDevice) {
-    //   toast.success(String(responseCheckDevice));
-    const responseCheckThreadCamHdmi =
-      await CheckThreadCamHdmiService.getAllData();
-    if (responseCheckThreadCamHdmi) {
-      toast.success(String(responseCheckThreadCamHdmi));
-      const formData = new FormData();
-      formData.append(
-        "data",
-        JSON.stringify({
-          implementation_date: missionDate,
-          monitoring_options: flightMethod,
-        })
-      );
-      getConfirmedDataFromWS(formData);
+    if (responseCheckDevice) {
+      toast.success(String(responseCheckDevice));
+      const responseCheckThreadCamHdmi =
+        await CheckThreadCamHdmiService.getAllData();
+      if (responseCheckThreadCamHdmi) {
+        toast.success(String(responseCheckThreadCamHdmi));
+        const formData = new FormData();
+        formData.append(
+          "data",
+          JSON.stringify({
+            implementation_date: missionDate,
+            monitoring_options: flightMethod,
+          })
+        );
+        getConfirmedDataFromWS(formData);
+      } else {
+        setHadCompletedSetUpBeforeFly(false);
+      }
     } else {
       setHadCompletedSetUpBeforeFly(false);
     }
-    // } else {
-    //   setHadCompletedSetUpBeforeFly(false);
-    // }
   };
 
   const setUpBeforeFly = () => {
@@ -581,258 +556,6 @@ const Flight = () => {
     );
   };
 
-  const ObjectCount = () => {
-    const trafficData = [
-      {
-        icon: "👤",
-        label: "người",
-        count: objCount && objCount.people >= 0 ? objCount.people : 0,
-      },
-      {
-        icon: "🚲",
-        label: "xe đạp",
-        count: objCount && objCount.bicycle >= 0 ? objCount.bicycle : 0,
-      },
-      {
-        icon: "🚗",
-        label: "ô tô",
-        count: objCount && objCount.car >= 0 ? objCount.car : 0,
-      },
-      {
-        icon: "🚚",
-        label: "xe tải",
-        count: objCount && objCount.truck >= 0 ? objCount.truck : 0,
-      },
-      {
-        icon: "🛺",
-        label: "xe ba bánh",
-        count: objCount && objCount.tricycle >= 0 ? objCount.tricycle : 0,
-      },
-      {
-        icon: "🚌",
-        label: "xe buýt",
-        count: objCount && objCount.bus >= 0 ? objCount.bus : 0,
-      },
-      {
-        icon: "🏍️",
-        label: "xe máy",
-        count: objCount && objCount.motor >= 0 ? objCount.motor : 0,
-      },
-    ];
-
-    const crowdSenseData = {
-      icon: "👤",
-      label: "người",
-      count: objCount && objCount.people,
-    };
-
-    if (flightMethod === "traffic") {
-      return (
-        <div
-          className="absolute z-3 top-40 right-[17px] bg-white border-2 
-        border-red-400 opacity-90 rounded-lg shadow !p-4 w-55 flex flex-wrap justify-center"
-        >
-          {/* UN TAC */}
-          {trafficDensity === "congested" && (
-            <>
-              <p className="text-lg text-gray-800 text-center">
-                Tình trạng giao thông:{" "}
-                <span className="font-bold text-gray-800">Ùn tắc</span>
-              </p>
-              <div className="w-full h-2 bg-red-500 !my-1"></div>
-            </>
-          )}
-          {/* LUU THONG CHAM */}
-          {trafficDensity === "normal" && (
-            <>
-              <p className="text-lg text-gray-800 text-center">
-                Tình trạng giao thông:{" "}
-                <span className="font-bold text-gray-800">Lưu thông chậm</span>
-              </p>
-              <div className="w-full h-2 bg-yellow-500 !my-1"></div>
-            </>
-          )}
-          {/* THONG THOANG */}
-          {trafficDensity === "clear" && (
-            <>
-              <p className="text-lg text-gray-800 text-center">
-                Tình trạng giao thông:{" "}
-                <span className="font-bold text-gray-800">Thông thoáng</span>
-              </p>
-              <div className="w-full h-2 bg-green-500 !my-1"></div>
-            </>
-          )}
-          <ul className="space-y-3">
-            {trafficData.map((item, index) => (
-              <li key={index} className="flex items-center">
-                <span className="w-10 text-2xl mr-2">{item.icon}</span>{" "}
-                {/* Larger icons */}
-                <div>
-                  <p className="font-medium text-gray-800">
-                    {item.label}: {item.count}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
-    } else if (flightMethod === "people") {
-      return (
-        <div className="absolute z-3 top-40 right-[17px] bg-white border-2 border-red-400 opacity-90 rounded-lg shadow !p-4 w-45">
-          <ul className="space-y-3">
-            <li className="flex items-center">
-              <span className="w-10 text-2xl mr-2">{crowdSenseData.icon}</span>{" "}
-              {/* Larger icons */}
-              <div>
-                <p className="font-medium text-gray-800">
-                  {crowdSenseData.label}:{" "}
-                  {crowdSenseData.count >= 0 ? crowdSenseData.count : 0}
-                </p>
-              </div>
-            </li>
-          </ul>
-        </div>
-      );
-    } else if (flightMethod === "fire_smoke" || flightMethod === "tracking") {
-      return null;
-    } else {
-      return null;
-    }
-  };
-
-  const defectList = () => {
-    return (
-      <>
-        <div
-          className={`absolute z-2 ${
-            openDefectList
-              ? "bottom-[calc((100%-64px-60px+210px)/3)] !left-[350px] transition-all duration-500 ease-out"
-              : "bottom-[calc((100%-64px-60px+210px)/3)] left-0 transition-all duration-500 ease-in"
-          }`}
-        >
-          <button
-            className="bg-gray-300 flex justify-center w-3 rounded-lg"
-            onClick={() => setOpenDefectList(!openDefectList)}
-          >
-            {openDefectList ? (
-              <KeyboardArrowLeftIcon sx={{ color: "black" }} />
-            ) : (
-              <KeyboardArrowRightIcon sx={{ color: "black" }} />
-            )}
-          </button>
-        </div>
-
-        <div
-          className={`absolute z-1 w-[350px] h-[calc(100%-64px-60px-82px)] 
-            bg-white left-0 bottom-[30px] flex flex-col 
-            items-center overflow-y-auto rounded-r-[15px] !py-2 ${
-              openDefectList
-                ? "opacity-100 transition-opacity duration-500 ease-in"
-                : "opacity-0"
-            }`}
-        >
-          <div
-            className="bg-red-500 text-white p-0.25 uppercase 
-            text-center rounded-lg w-[95%] shadow-lg font-bold"
-          >
-            <h1>BẤT THƯỜNG PHÁT HIỆN</h1>
-          </div>
-          {defectInfo.length > 0 &&
-            defectInfo
-              .slice()
-              .reverse()
-              .map((defect, index) => {
-                return (
-                  <div
-                    key={index}
-                    className={`!mt-5.5 w-[95%] shadow-lg font-bold bg-white 
-                      text-black rounded-lg border border-gray-400 ${
-                        index === 0 ? "blink-red-border" : ""
-                      }`}
-                  >
-                    <div className="!p-2.5 uppercase">
-                      <table>
-                        <tr>
-                          <td width={"30px"}>
-                            <Icon path={mdiBellAlert} color={"red"} size={1} />
-                          </td>
-                          <td>
-                            <p>{defect.defect_name}</p>
-                          </td>
-                          {index === 0 && (
-                            <td className="flex justify-center items-center">
-                              <Icon path={mdiNewBox} size={1.5} color={"red"} />
-                            </td>
-                          )}
-                        </tr>
-                        <tr>
-                          <td width={"30px"}>
-                            <PinDropIcon style={{ color: "#00C8F8" }} />
-                          </td>
-                          <td>
-                            TỌA ĐỘ: {parseFloat(defect.defect_gis.latitude)},{" "}
-                            {parseFloat(defect.defect_gis.longtitude)}
-                          </td>
-                          <td>
-                            <Button
-                              title="Copy tọa độ xảy ra lỗi"
-                              onClick={() => {
-                                navigator.clipboard.writeText(
-                                  `${parseFloat(
-                                    defect.defect_gis.latitude
-                                  )}, ${parseFloat(
-                                    defect.defect_gis.longtitude
-                                  )}`
-                                );
-                                toast.success("Đã copy tọa độ");
-                              }}
-                            >
-                              <ContentCopyIcon />
-                            </Button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td width={"30px"}>
-                            <FontAwesomeIcon
-                              icon={faMapLocationDot}
-                              color="blue"
-                            />
-                          </td>
-                          <td>ĐỊA CHỈ CHI TIẾT: {defect.defect_location}</td>
-                        </tr>
-                      </table>
-                    </div>
-                    <div className="text-center !p-2">
-                      <Button
-                        className=""
-                        variant="outlined"
-                        color="success"
-                        onClick={() =>
-                          setOpenZoomingImg(
-                            import.meta.env.VITE_API_URL +
-                              defect.defect_image[0]
-                          )
-                        }
-                      >
-                        Xem ảnh
-                      </Button>
-                      <ImageZoom
-                        info={
-                          import.meta.env.VITE_API_URL + defect.defect_image[0]
-                        }
-                        openZoomingImg={openZoomingImg}
-                        setOpenZoomingImg={setOpenZoomingImg}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-        </div>
-      </>
-    );
-  };
-
   return (
     <>
       {!showVideoStreamOnly && (
@@ -851,12 +574,16 @@ const Flight = () => {
 
       {setUpBeforeFly()}
 
-      {startFly &&
-        !showVideoStreamOnly &&
-        flightMethod !== "tracking" &&
-        defectList()}
+      {startFly && !showVideoStreamOnly && flightMethod !== "tracking" && (
+        <DefectListPanel
+          openDefectList={openDefectList}
+          setOpenDefectList={setOpenDefectList}
+          defectInfo={defectInfo}
+          openZoomingImg={openZoomingImg}
+          setOpenZoomingImg={setOpenZoomingImg}
+        />
+      )}
 
-      {/* TODO */}
       {startFly && devices.length > 0 && videoStreamUrl && (
         <div className="relative w-screen h-[calc(100vh-55px)] flex justify-center items-center bg-gray-200">
           {/* Video stream */}
@@ -891,7 +618,6 @@ const Flight = () => {
             };
             setHasCalledVideoStreamApi(false);
             setVideoStreamUrl("");
-            // if (!ws || !ws.current) return;
             sendMessage(JSON.stringify(modifyDataSentToWS));
           }}
         >
@@ -914,7 +640,13 @@ const Flight = () => {
         </button>
       )}
 
-      {startFly && !showVideoStreamOnly && <ObjectCount />}
+      {startFly && !showVideoStreamOnly && (
+        <ObjectCountPanel
+          objCount={objCount}
+          flightMethod={flightMethod}
+          trafficDensity={trafficDensity}
+        />
+      )}
 
       {hadCompletedSetUpBeforeFly && <Loading />}
     </>
