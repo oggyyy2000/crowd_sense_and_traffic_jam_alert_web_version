@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { GlobalStateContext } from "../../utils/context/Contexts";
 
@@ -10,10 +10,20 @@ import {
   Typography,
   Menu,
   Container,
+  Dialog,
+  DialogTitle,
+  Button,
+  DialogContent,
+  Input,
+  DialogActions,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-
+import SettingsIcon from "@mui/icons-material/Settings";
+import CloseIcon from "@mui/icons-material/Close";
 import Logo_white from "../../assets/images/drone_logo_white.svg";
+
+import * as SettingWorkstationService from "../../APIServices/SettingWorkstation.api";
+import { toast } from "react-toastify";
 
 const pages = [
   {
@@ -31,6 +41,11 @@ const pages = [
 const Navbar = () => {
   const [anchorElNav, setAnchorElNav] = useState<null | HTMLElement>(null);
 
+  // setting variable
+  const [openUserAccountSetting, setOpenUserAccountSetting] = useState(false);
+  const [peopleWarning, setPeopleWarning] = useState("");
+  const [trafficWarning, setTrafficWarning] = useState("");
+
   const globalStateContext = useContext(GlobalStateContext);
   const startFly = globalStateContext?.startFly;
 
@@ -41,6 +56,37 @@ const Navbar = () => {
   const handleCloseNavMenu = () => {
     setAnchorElNav(null);
   };
+
+  const handleUpdateSetting = async () => {
+    const formData = new FormData();
+    formData.append("people_warning", peopleWarning);
+    formData.append("traffic_warning", trafficWarning);
+    const response = await SettingWorkstationService.postData({
+      data: formData,
+      options: {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      },
+    });
+    if (response) {
+      toast.success(String(response));
+    }
+  };
+
+  useEffect(() => {
+    if (openUserAccountSetting) {
+      const getDefaultSetting = async () => {
+        const response = await SettingWorkstationService.getAllData();
+        if (response) {
+          console.log("response: ", response);
+          setPeopleWarning(response.people_warning);
+          setTrafficWarning(response.traffic_warning);
+        }
+      };
+      getDefaultSetting();
+    }
+  }, [openUserAccountSetting]);
   return (
     <>
       <AppBar position="static">
@@ -67,7 +113,7 @@ const Navbar = () => {
                 textDecoration: "none",
               }}
             >
-              VSHTECH
+              SMWORKSTATION
             </Typography>
 
             <Box sx={{ flexGrow: 1, display: { xs: "flex", md: "none" } }}>
@@ -144,7 +190,7 @@ const Navbar = () => {
                 textDecoration: "none",
               }}
             >
-              VSHTECH
+              SMWORKSTATION
             </Typography>
 
             <Box sx={{ flexGrow: 1, display: { xs: "none", md: "flex" } }}>
@@ -170,6 +216,97 @@ const Navbar = () => {
                   {page.ten_navbar}
                 </Link>
               ))}
+            </Box>
+
+            <Box>
+              <IconButton
+                onClick={() => setOpenUserAccountSetting(true)}
+                sx={{ p: 1 }}
+                title="Cài đặt"
+              >
+                <SettingsIcon fontSize="large" style={{ color: "white" }} />
+              </IconButton>
+              <Dialog open={openUserAccountSetting} fullWidth maxWidth={"xs"}>
+                <DialogTitle
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    backgroundColor: "#1976d2",
+                    color: "white",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Cài đặt
+                  <Button
+                    color="error"
+                    variant="contained"
+                    sx={{
+                      position: "absolute",
+                      right: "5px",
+                      top: "5px",
+                      height: "25px",
+                      padding: "0 13px",
+                      minWidth: "10px !important",
+                      width: "20px",
+                      borderRadius: "50%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyItems: "center",
+                    }}
+                    onClick={() => setOpenUserAccountSetting(false)}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </Button>
+                </DialogTitle>
+                <DialogContent>
+                  <div>
+                    <div style={{ textAlign: "center" }}>
+                      <span>Số người cảnh báo đám đông</span>
+                      <Input
+                        value={peopleWarning}
+                        size="small"
+                        onChange={(e) => setPeopleWarning(e.target.value)}
+                        inputProps={{
+                          step: 1,
+                          min: 0,
+                          max: 1000,
+                          type: "number",
+                          "aria-labelledby": "input-slider",
+                          name: "peopleWarning", // Add a unique name for identification
+                        }}
+                        style={{ width: "40px", marginLeft: "10px" }}
+                      />
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <span>Số xe để cảnh báo có ùn tắc</span>
+                      <Input
+                        value={trafficWarning}
+                        size="small"
+                        onChange={(e) => setTrafficWarning(e.target.value)}
+                        inputProps={{
+                          step: 1,
+                          min: 0,
+                          max: 1000,
+                          type: "number",
+                          "aria-labelledby": "input-slider",
+                          name: "trafficWarning", // Add a unique name for identification
+                        }}
+                        style={{ width: "40px", marginLeft: "10px" }}
+                      />
+                    </div>
+                  </div>
+                </DialogContent>
+                <DialogActions style={{ justifyContent: "center" }}>
+                  <Button
+                    onClick={handleUpdateSetting}
+                    color="primary"
+                    variant="contained"
+                    disabled={startFly ? true : false}
+                  >
+                    Cập nhật cài đặt
+                  </Button>
+                </DialogActions>
+              </Dialog>
             </Box>
           </Toolbar>
         </Container>
