@@ -16,7 +16,7 @@ import {
   CountObjectType,
 } from "../../types/global/WSData.type";
 
-import { WSContext } from "../../utils/context/Contexts";
+import useWebSocket, { ReadyState } from "react-use-websocket";
 import { GlobalStateContext } from "../../utils/context/Contexts";
 
 import {
@@ -114,10 +114,29 @@ const Flight = () => {
   const [openDefectList, setOpenDefectList] = useState(false);
 
   // WS variable
-  const wsContext = useContext(WSContext);
-  const ws = wsContext?.ws;
-  const connect = wsContext?.connect;
-  const disconnect = wsContext?.disconnect;
+  const { sendMessage, lastMessage, readyState } = useWebSocket(
+    import.meta.env.VITE_WS_URL,
+    {
+      // onError: (event) => {
+      //   console.log("WebSocket error:", event);
+      // },
+      // onMessage(event) {
+      //   console.log("WebSocket message received:", event);
+      // },
+      // onClose: (event) => {
+      //   console.log("WebSocket closed:", event);
+      //   // Tại đây bạn có thể đọc event.reason (hoặc code) để xác định lỗi phía backend
+      //   toast.error(`Server báo lỗi: ${event.reason}`);
+      // },
+      shouldReconnect: () => {
+        // toast.error("Lỗi không gửi được yêu cầu !", {
+        //   autoClose: 4000,
+        //   onClose: () => window.location.reload(),
+        // });
+        return true;
+      }, // autoreconnect
+    }
+  );
   const globalStateContext = useContext(GlobalStateContext);
   const startFly = globalStateContext?.startFly;
   const setStartFly = globalStateContext?.setStartFly;
@@ -143,11 +162,32 @@ const Flight = () => {
     resetHasShownLostConnectionToServerToast();
   }, [location]);
 
+  // useEffect(() => {
+  //   if (connect) {
+  //     connect();
+  //   }
+  // }, [connect]);
+
   useEffect(() => {
-    if (connect) {
-      connect();
+    if (readyState) {
+      switch (readyState) {
+        case ReadyState.UNINSTANTIATED:
+          console.log("WebSocket chưa được khởi tạo.");
+          break;
+        case ReadyState.OPEN:
+          console.log("WebSocket đã được kết nối.");
+          break;
+        case ReadyState.CLOSING:
+          console.log("Đang đóng kết nối WebSocket...");
+          break;
+        case ReadyState.CLOSED:
+          console.log("Đã đóng kết nối WebSocket.");
+          break;
+        default:
+          break;
+      }
     }
-  }, [connect]);
+  }, [readyState]);
 
   useEffect(() => {
     const handleDevices = (mediaDevices: MediaDeviceInfo[]) =>
@@ -169,43 +209,45 @@ const Flight = () => {
   }, []);
 
   useEffect(() => {
+    if (!lastMessage) return; // Chưa có tin nhắn
     try {
-      if (!ws || !ws.current) return;
-      ws.current.onmessage = (e: MessageEvent) => {
-        const data = JSON.parse(e.data);
-        console.log("endSocketData: ", data);
-        if (data.data_state === "supervise_complete") {
-          toast.success("Đã hoàn thành nhiệm vụ !", {
-            onClose: () => {
-              if (setStartFly) {
-                setStartFly(false);
-              }
-              if (disconnect) {
-                disconnect();
-              }
-              setFlightMethod("");
-              setDefectInfo([]);
-              setObjCount({
-                people: 0,
-                bicycle: 0,
-                car: 0,
-                truck: 0,
-                tricycle: 0,
-                bus: 0,
-                motor: 0,
-              });
-              setTrafficDensity("");
-              // setPolylineMap([]);
-              setCurrentLocation(null);
-              setCenterMap({
-                lat: 21.002890438729345,
-                lng: 105.86171273377768,
-              });
-              window.location.hash = "/ManageFlightData";
-            },
-          });
-        }
-        console.log("data:", data);
+      // if (!ws || !ws.current) return;
+      // ws.current.onmessage = (e: MessageEvent) => {
+      const data = JSON.parse(lastMessage.data);
+      console.log("endSocketData: ", data);
+      if (data.data_state === "supervise_complete") {
+        toast.success("Đã hoàn thành nhiệm vụ !", {
+          onClose: () => {
+            if (setStartFly) {
+              setStartFly(false);
+            }
+            // if (disconnect) {
+            //   disconnect();
+            // }
+            setFlightMethod("");
+            setDefectInfo([]);
+            setObjCount({
+              people: 0,
+              bicycle: 0,
+              car: 0,
+              truck: 0,
+              tricycle: 0,
+              bus: 0,
+              motor: 0,
+            });
+            setTrafficDensity("");
+            // setPolylineMap([]);
+            setCurrentLocation(null);
+            setCenterMap({
+              lat: 21.002890438729345,
+              lng: 105.86171273377768,
+            });
+            window.location.hash = "/ManageFlightData";
+          },
+        });
+      }
+      console.log("data:", data);
+      if (data && data.metadata && data.metadata.detections) {
         const gis = data.metadata.detections.gis;
         const defectWS = data.metadata.detections.defects;
         const objectCountWS = data.metadata.detections.count_object;
@@ -257,11 +299,12 @@ const Flight = () => {
             setTrafficDensity(trafficDensityWS);
           }
         }
-      };
+        // };
+      }
     } catch (error) {
       console.log("Error from WS: ", error);
     }
-  }, [ws, disconnect, setStartFly, startFly, hasCalledVideoStreamApi]);
+  }, [lastMessage, setStartFly, startFly, hasCalledVideoStreamApi]);
 
   useEffect(() => {
     if (startFly && defectInfo.length > 0) {
@@ -302,8 +345,8 @@ const Flight = () => {
       const startX = e.clientX - rect.left;
       const startY = e.clientY - rect.top;
 
-      if (!ws || !ws.current) return;
-      ws.current.send(
+      // if (!ws || !ws.current) return;
+      sendMessage(
         JSON.stringify({
           action: "reset_tracker",
         })
@@ -319,8 +362,8 @@ const Flight = () => {
   const handleRightClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault(); // Ngăn menu ngữ cảnh mặc định hiện ra
 
-    if (!ws || !ws.current) return;
-    ws.current.send(
+    // if (!ws || !ws.current) return;
+    sendMessage(
       JSON.stringify({
         action: "reset_tracker",
       })
@@ -354,9 +397,9 @@ const Flight = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     setIsDrawing(false);
-    if (!ws || !ws.current) return;
+    // if (!ws || !ws.current) return;
     if (hasMouseMoved && rect && rect.width > 5 && rect.height > 5) {
-      ws.current.send(
+      sendMessage(
         JSON.stringify({
           action: "update_roi",
           point: [rect.x, rect.y, rect.width, rect.height],
@@ -367,8 +410,8 @@ const Flight = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
 
-      if (ws.current && rect) {
-        ws.current.send(
+      if (rect) {
+        sendMessage(
           JSON.stringify({
             action: "update_roi",
             point: [rect.x, rect.y],
@@ -411,8 +454,8 @@ const Flight = () => {
       };
       console.log("modifyDataSentToWS: ", modifyDataSentToWS);
 
-      if (!ws || !ws.current) return;
-      ws.current.send(JSON.stringify(modifyDataSentToWS));
+      // if (!ws || !ws.current) return;
+      sendMessage(JSON.stringify(modifyDataSentToWS));
       handleCloseSetUpBeforeFly();
     } else {
       setHadCompletedSetUpBeforeFly(false);
@@ -421,29 +464,29 @@ const Flight = () => {
 
   const handleSubmitSetUpBeforeFly = async () => {
     setHadCompletedSetUpBeforeFly(true);
-    const responseCheckDevice = await CheckdeviceService.getAllData();
+    // const responseCheckDevice = await CheckdeviceService.getAllData();
 
-    if (responseCheckDevice) {
-      toast.success(String(responseCheckDevice));
-      const responseCheckThreadCamHdmi =
-        await CheckThreadCamHdmiService.getAllData();
-      if (responseCheckThreadCamHdmi) {
-        toast.success(String(responseCheckThreadCamHdmi));
-        const formData = new FormData();
-        formData.append(
-          "data",
-          JSON.stringify({
-            implementation_date: missionDate,
-            monitoring_options: flightMethod,
-          })
-        );
-        getConfirmedDataFromWS(formData);
-      } else {
-        setHadCompletedSetUpBeforeFly(false);
-      }
+    // if (responseCheckDevice) {
+    //   toast.success(String(responseCheckDevice));
+    const responseCheckThreadCamHdmi =
+      await CheckThreadCamHdmiService.getAllData();
+    if (responseCheckThreadCamHdmi) {
+      toast.success(String(responseCheckThreadCamHdmi));
+      const formData = new FormData();
+      formData.append(
+        "data",
+        JSON.stringify({
+          implementation_date: missionDate,
+          monitoring_options: flightMethod,
+        })
+      );
+      getConfirmedDataFromWS(formData);
     } else {
       setHadCompletedSetUpBeforeFly(false);
     }
+    // } else {
+    //   setHadCompletedSetUpBeforeFly(false);
+    // }
   };
 
   const setUpBeforeFly = () => {
@@ -848,8 +891,8 @@ const Flight = () => {
             };
             setHasCalledVideoStreamApi(false);
             setVideoStreamUrl("");
-            if (!ws || !ws.current) return;
-            ws.current.send(JSON.stringify(modifyDataSentToWS));
+            // if (!ws || !ws.current) return;
+            sendMessage(JSON.stringify(modifyDataSentToWS));
           }}
         >
           Kết thúc kiểm tra
