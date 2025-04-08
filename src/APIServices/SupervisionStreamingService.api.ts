@@ -1,16 +1,16 @@
 import customAxios from "../utils/customAxios";
 import {
-  RequestOptionsType,
   postRequestSupervisionStreamingServiceDataType,
   postResponseSupervisionStreamingServiceDataType,
 } from "../types/APIServices/SupervisionStreamingService.type";
+import { RequestFormDataOptionsType } from "../types/global/Global.type";
 
 export const postData = async ({
   data,
   options,
 }: {
   data: postRequestSupervisionStreamingServiceDataType;
-  options: RequestOptionsType;
+  options: RequestFormDataOptionsType;
 }) => {
   try {
     const response =

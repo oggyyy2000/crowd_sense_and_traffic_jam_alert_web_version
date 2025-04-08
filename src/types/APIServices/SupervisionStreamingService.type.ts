@@ -1,9 +1,3 @@
-export type RequestOptionsType = {
-  headers: {
-    "Content-Type": string;
-  };
-};
-
 export type postRequestSupervisionStreamingServiceDataType = FormData;
 
 export type postResponseSupervisionStreamingServiceDataType = {
