@@ -10,16 +10,16 @@ import { SupervisionDetailsResponseType } from "../../types/APIServices/Supervis
 
 import {
   Box,
-  FormControl,
+  // FormControl,
   ImageList,
   ImageListItem,
-  MenuItem,
+  // MenuItem,
   Pagination,
-  Select,
+  // Select,
   TextField,
   Button,
 } from "@mui/material";
-import Grid from "@mui/material/Grid2";
+import Grid from "@mui/material/Grid";
 
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
@@ -41,7 +41,7 @@ const ManageFlightData = () => {
   const [listImageByMission, setListImageByMission] = useState<
     SupervisionDetailsResponseType[]
   >([]);
-  const [imageType, setImageType] = useState("all");
+  // const [imageType, setImageType] = useState("all");
 
   // pagination
   const [page, setPage] = useState(1); // Current page
@@ -92,7 +92,7 @@ const ManageFlightData = () => {
     const getListMissionByHour = async () => {
       const response = await SupervisionSchedulesService.getAllData(scheduleId);
       if (response) {
-        setListScheduleByHour(response);
+        setListScheduleByHour(response.reverse());
         setMissionId(response[0].mission_id);
       }
     };
@@ -104,7 +104,7 @@ const ManageFlightData = () => {
   useEffect(() => {
     const getListImageByMission = async () => {
       const response = await SupervisionDetailsService.getData({
-        supervisionDetailsEndpoint: `supervisiondetails/?mission_id=${missionId}&img_label=${imageType}`,
+        supervisionDetailsEndpoint: `supervisiondetails/?mission_id=${missionId}&img_label=all`,
       });
       if (response) {
         setListImageByMission(response);
@@ -114,7 +114,7 @@ const ManageFlightData = () => {
     if (missionId) {
       getListImageByMission();
     }
-  }, [missionId, imageType]);
+  }, [missionId]);
 
   return (
     <Box sx={{ flexGrow: 1 }}>
@@ -192,7 +192,7 @@ const ManageFlightData = () => {
         <Grid size={9.5}>
           {listImageByMission && listImageByMission.length > 0 ? (
             <>
-              <div className="h-12 !my-1">
+              {/* <div className="h-12 !my-1">
                 <FormControl
                   sx={{ position: "absolute", right: 10, width: "200px" }}
                   variant="outlined"
@@ -204,17 +204,15 @@ const ManageFlightData = () => {
                     defaultValue={""}
                   >
                     <MenuItem value={"all"}>Tất cả ảnh</MenuItem>
-                    <MenuItem value={"tutap"}>Tụ tập</MenuItem>
-                    <MenuItem value={"untac"}>Ùn tắc</MenuItem>
                   </Select>
                 </FormControl>
-              </div>
+              </div> */}
               <ImageList
                 cols={3}
                 gap={20}
                 sx={{
                   width: "100%",
-                  height: "calc(100vh - 165px)",
+                  height: "calc(100vh - 109px)",
                   overflowY: "auto",
                 }}
               >
