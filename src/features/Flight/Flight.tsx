@@ -1,19 +1,15 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { useLocation } from "react-router-dom";
-
-// import Webcam from "react-webcam";
 
 import { resetHasShownLostConnectionToServerToast } from "../../utils/customAxios";
 import * as SupervisionStreamingService from "../../APIServices/SupervisionStreamingService.api";
 import * as CheckdeviceService from "../../APIServices/CheckdeviceService.api";
 import * as CheckThreadCamHdmiService from "../../APIServices/CheckThreadCamHdmiService.api";
+import * as MonitoringOptionService from "../../APIServices/MonitoringOption.api";
 
-import {
-  postRequestSupervisionStreamingServiceDataType,
-  postResponseSupervisionStreamingServiceDataType,
-} from "../../types/APIServices/SupervisionStreamingService.type";
-
+import { getMonitoringOptionResponseType } from "../../types/APIServices/MonitoringOption.type";
+import { postRequestSupervisionStreamingServiceDataType } from "../../types/APIServices/SupervisionStreamingService.type";
 import {
   GISDataType,
   DefectType,
@@ -42,17 +38,27 @@ import PinDropIcon from "@mui/icons-material/PinDrop";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import Icon from "@mdi/react";
 import { mdiBellAlert } from "@mdi/js";
+import { mdiNewBox } from "@mdi/js";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMapLocationDot } from "@fortawesome/free-solid-svg-icons";
+import CropFreeIcon from "@mui/icons-material/CropFree";
 
 import Map from "../../components/Map/Map";
 import axios from "axios";
 import ImageZoom from "../../components/Zooming/ImageZoom";
+import Loading from "../../components/LoadingPage/LoadingPage";
 
 // type PolylineMap = {
 //   lat: number;
 //   lng: number;
 // };
+
+type rectTrackingBoxType = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 type MediaDeviceInfo = {
   kind: string;
@@ -68,6 +74,9 @@ const Flight = () => {
     .toString()
     .padStart(2, "0")}-${dt.getDate().toString().padStart(2, "0")}`;
   const [missionDate, setMissionDate] = useState(currentDate);
+  const [monitoringOptions, setMonitoringOptions] = useState<
+    getMonitoringOptionResponseType[]
+  >([]);
   const [flightMethod, setFlightMethod] = useState("");
   console.log("flightMethod: ", flightMethod);
   const [videoStreamUrl, setVideoStreamUrl] = useState("");
@@ -99,6 +108,7 @@ const Flight = () => {
     bus: 0,
     motor: 0,
   });
+  const [trafficDensity, setTrafficDensity] = useState("");
 
   // defect list variable
   const [openDefectList, setOpenDefectList] = useState(false);
@@ -111,6 +121,7 @@ const Flight = () => {
   const globalStateContext = useContext(GlobalStateContext);
   const startFly = globalStateContext?.startFly;
   const setStartFly = globalStateContext?.setStartFly;
+  const [hasCalledVideoStreamApi, setHasCalledVideoStreamApi] = useState(false);
 
   // lay cam tu uav
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -118,6 +129,15 @@ const Flight = () => {
 
   // zoom anh defect
   const [openZoomingImg, setOpenZoomingImg] = useState("");
+
+  // show video stream only
+  const [showVideoStreamOnly, setShowVideoStreamOnly] = useState(false);
+
+  // draw tracking box
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [rect, setRect] = useState<rectTrackingBoxType | null>(null);
+  const [hasMouseMoved, setHasMouseMoved] = useState(false); // Theo dõi xem chuột đã di chuyển chưa
 
   useEffect(() => {
     resetHasShownLostConnectionToServerToast();
@@ -136,6 +156,16 @@ const Flight = () => {
     if (navigator.mediaDevices?.enumerateDevices) {
       navigator.mediaDevices.enumerateDevices().then(handleDevices);
     }
+  }, []);
+
+  useEffect(() => {
+    const getMonitoringOption = async () => {
+      const response = await MonitoringOptionService.getAllData();
+      if (response) {
+        setMonitoringOptions(response);
+      }
+    };
+    getMonitoringOption();
   }, []);
 
   useEffect(() => {
@@ -164,6 +194,7 @@ const Flight = () => {
                 bus: 0,
                 motor: 0,
               });
+              setTrafficDensity("");
               // setPolylineMap([]);
               setCurrentLocation(null);
               setCenterMap({
@@ -178,11 +209,30 @@ const Flight = () => {
         const gis = data.metadata.detections.gis;
         const defectWS = data.metadata.detections.defects;
         const objectCountWS = data.metadata.detections.count_object;
+        const trafficDensityWS = data.metadata.detections.label_traffic;
 
         if (gis !== undefined) {
+          setHadCompletedSetUpBeforeFly(false);
           if (setStartFly) {
             setStartFly(true);
           }
+          if (!hasCalledVideoStreamApi) {
+            try {
+              console.log("Calling video stream API for the first time");
+              const response = axios.get(
+                "http://localhost:8000/video-stream/",
+                {
+                  responseType: "stream",
+                }
+              );
+              console.log("response: ", response);
+              // Đánh dấu là API đã được gọi
+              setHasCalledVideoStreamApi(true);
+            } catch (error) {
+              console.log("Error calling video stream API: ", error);
+            }
+          }
+          setVideoStreamUrl("http://localhost:8000/video-stream/");
           console.log("currentLocationFromWS: ", gis);
           setCurrentLocation(gis);
           setCenterMap({
@@ -203,12 +253,15 @@ const Flight = () => {
           if (objectCountWS !== undefined) {
             setObjCount(objectCountWS);
           }
+          if (trafficDensityWS !== undefined) {
+            setTrafficDensity(trafficDensityWS);
+          }
         }
       };
     } catch (error) {
       console.log("Error from WS: ", error);
     }
-  }, [ws, disconnect, setStartFly, startFly]);
+  }, [ws, disconnect, setStartFly, startFly, hasCalledVideoStreamApi]);
 
   useEffect(() => {
     if (startFly && defectInfo.length > 0) {
@@ -218,67 +271,126 @@ const Flight = () => {
     }
   }, [startFly, defectInfo.length]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    const drawRectangle = () => {
+      if (!rect || !ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Xóa hình cũ
+
+      // Vẽ vùng bên trong (độ mờ 0.8)
+      ctx.fillStyle = "rgba(255, 0, 0, 0.2)"; // điều chỉnh giá trị alpha
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+
+      // Vẽ viền
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    };
+
+    drawRectangle();
+  }, [rect]);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Chỉ xử lý khi nhấn chuột trái (button 0)
+    if (e.button !== 0) return;
+
+    if (canvasRef && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const startX = e.clientX - rect.left;
+      const startY = e.clientY - rect.top;
+
+      if (!ws || !ws.current) return;
+      ws.current.send(
+        JSON.stringify({
+          action: "reset_tracker",
+        })
+      );
+
+      setIsDrawing(true);
+      setRect({ x: startX, y: startY, width: 0, height: 0 });
+      setHasMouseMoved(false); // Reset trạng thái di chuyển chuột
+    }
+  };
+
+  // Hàm xử lý nhấn chuột phải để reset tracker
+  const handleRightClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault(); // Ngăn menu ngữ cảnh mặc định hiện ra
+
+    if (!ws || !ws.current) return;
+    ws.current.send(
+      JSON.stringify({
+        action: "reset_tracker",
+      })
+    );
+    console.log("Reset tracker by right click");
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    // Đánh dấu là chuột đã di chuyển (để phân biệt giữa click và drag)
+    setHasMouseMoved(true);
+    if (canvasRef && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const currentY = e.clientY - rect.top;
+
+      setRect((prev) => {
+        if (!prev) return { x: currentX, y: currentY, width: 0, height: 0 };
+        return {
+          ...prev,
+          width: currentX - prev.x,
+          height: currentY - prev.y,
+        };
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    setIsDrawing(false);
+    if (!ws || !ws.current) return;
+    if (hasMouseMoved && rect && rect.width > 5 && rect.height > 5) {
+      ws.current.send(
+        JSON.stringify({
+          action: "update_roi",
+          point: [rect.x, rect.y, rect.width, rect.height],
+        })
+      );
+    } else {
+      // Nếu không di chuyển hoặc di chuyển rất ít, xử lý như click đơn
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      if (ws.current && rect) {
+        ws.current.send(
+          JSON.stringify({
+            action: "update_roi",
+            point: [rect.x, rect.y],
+          })
+        );
+        console.log("Sent single point:", [rect.x, rect.y]);
+      }
+    }
+
+    setTimeout(() => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height); // Xóa hình cũ
+      setRect(null);
+    }, 100);
+  };
+
   const handleOpenSetUpBeforeFly = () => {
     setOpenSetUpBeforeFly(true);
   };
 
   const handleCloseSetUpBeforeFly = () => {
-    setHadCompletedSetUpBeforeFly(false);
     setOpenSetUpBeforeFly(false);
     setMissionDate(currentDate);
-  };
-
-  const handleSubmitSetUpBeforeFly = async () => {
-    setHadCompletedSetUpBeforeFly(true);
-    // const responseCheckDevice = await CheckdeviceService.getAllData();
-
-    // if (responseCheckDevice) {
-    // toast.success(String(responseCheckDevice));
-    const responseCheckThreadCamHdmi =
-      await CheckThreadCamHdmiService.getAllData();
-    if (responseCheckThreadCamHdmi) {
-      toast.success(String(responseCheckThreadCamHdmi));
-      const formData = new FormData();
-      formData.append(
-        "data",
-        JSON.stringify({ implementation_date: missionDate })
-      );
-      getConfirmedDataFromWS(formData);
-    } else {
-      setHadCompletedSetUpBeforeFly(false);
-    }
-    // } else {
-    // setHadCompletedSetUpBeforeFly(false);
-    // }
-  };
-
-  const sendConfirmedDataToWS = (
-    data: postResponseSupervisionStreamingServiceDataType
-  ) => {
-    const modifyDataSentToWS = {
-      ...data,
-      action: "resume",
-    };
-    console.log("modifyDataSentToWS: ", modifyDataSentToWS);
-
-    if (!ws || !ws.current) return;
-    ws.current.send(JSON.stringify(modifyDataSentToWS));
-    if (setStartFly) {
-      setStartFly(true);
-    }
-
-    // TODO
-    try {
-      const response = axios.get("http://localhost:8000/video-stream/", {
-        responseType: "stream",
-      });
-      console.log("response: ", response);
-    } catch (error) {
-      console.log("Error calling video stream API: ", error);
-    }
-    setVideoStreamUrl("http://localhost:8000/video-stream/");
-
-    handleCloseSetUpBeforeFly();
   };
 
   const getConfirmedDataFromWS = async (
@@ -293,7 +405,42 @@ const Flight = () => {
       },
     });
     if (response) {
-      sendConfirmedDataToWS(response);
+      const modifyDataSentToWS = {
+        ...response,
+        action: "resume",
+      };
+      console.log("modifyDataSentToWS: ", modifyDataSentToWS);
+
+      if (!ws || !ws.current) return;
+      ws.current.send(JSON.stringify(modifyDataSentToWS));
+      handleCloseSetUpBeforeFly();
+    } else {
+      setHadCompletedSetUpBeforeFly(false);
+    }
+  };
+
+  const handleSubmitSetUpBeforeFly = async () => {
+    setHadCompletedSetUpBeforeFly(true);
+    const responseCheckDevice = await CheckdeviceService.getAllData();
+
+    if (responseCheckDevice) {
+      toast.success(String(responseCheckDevice));
+      const responseCheckThreadCamHdmi =
+        await CheckThreadCamHdmiService.getAllData();
+      if (responseCheckThreadCamHdmi) {
+        toast.success(String(responseCheckThreadCamHdmi));
+        const formData = new FormData();
+        formData.append(
+          "data",
+          JSON.stringify({
+            implementation_date: missionDate,
+            monitoring_options: flightMethod,
+          })
+        );
+        getConfirmedDataFromWS(formData);
+      } else {
+        setHadCompletedSetUpBeforeFly(false);
+      }
     } else {
       setHadCompletedSetUpBeforeFly(false);
     }
@@ -352,11 +499,11 @@ const Flight = () => {
                   onChange={(e) => setFlightMethod(e.target.value)}
                   defaultValue={""}
                 >
-                  <MenuItem value="damchay">Phát hiện đám cháy</MenuItem>
-                  <MenuItem value="untac">Phát hiện ùn tắc giao thông</MenuItem>
-                  <MenuItem value="damdongbatthuong">
-                    Phát hiện đám đông bất thường
-                  </MenuItem>
+                  {monitoringOptions.map((option, index) => (
+                    <MenuItem key={index} value={option.option_name}>
+                      {option.option_title}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </div>
@@ -393,13 +540,41 @@ const Flight = () => {
 
   const ObjectCount = () => {
     const trafficData = [
-      { icon: "👤", label: "người", count: objCount && objCount.people },
-      { icon: "🚲", label: "xe đạp", count: objCount && objCount.bicycle },
-      { icon: "🚗", label: "ô tô", count: objCount && objCount.car },
-      { icon: "🚚", label: "xe tải", count: objCount && objCount.truck },
-      { icon: "🛺", label: "xe ba bánh", count: objCount && objCount.tricycle },
-      { icon: "🚌", label: "xe buýt", count: objCount && objCount.bus },
-      { icon: "🏍️", label: "xe máy", count: objCount && objCount.motor },
+      {
+        icon: "👤",
+        label: "người",
+        count: objCount && objCount.people >= 0 ? objCount.people : 0,
+      },
+      {
+        icon: "🚲",
+        label: "xe đạp",
+        count: objCount && objCount.bicycle >= 0 ? objCount.bicycle : 0,
+      },
+      {
+        icon: "🚗",
+        label: "ô tô",
+        count: objCount && objCount.car >= 0 ? objCount.car : 0,
+      },
+      {
+        icon: "🚚",
+        label: "xe tải",
+        count: objCount && objCount.truck >= 0 ? objCount.truck : 0,
+      },
+      {
+        icon: "🛺",
+        label: "xe ba bánh",
+        count: objCount && objCount.tricycle >= 0 ? objCount.tricycle : 0,
+      },
+      {
+        icon: "🚌",
+        label: "xe buýt",
+        count: objCount && objCount.bus >= 0 ? objCount.bus : 0,
+      },
+      {
+        icon: "🏍️",
+        label: "xe máy",
+        count: objCount && objCount.motor >= 0 ? objCount.motor : 0,
+      },
     ];
 
     const crowdSenseData = {
@@ -408,30 +583,42 @@ const Flight = () => {
       count: objCount && objCount.people,
     };
 
-    if (flightMethod === "untac") {
+    if (flightMethod === "traffic") {
       return (
         <div
           className="absolute z-3 top-40 right-[17px] bg-white border-2 
         border-red-400 opacity-90 rounded-lg shadow !p-4 w-55 flex flex-wrap justify-center"
         >
           {/* UN TAC */}
-          {/* <p className="text-lg text-gray-800 text-center">
-            Tình trạng giao thông:{" "}
-            <span className="font-bold text-gray-800">Ùn tắc</span>
-          </p>
-          <div className="w-full h-2 bg-red-500 !my-1"></div> */}
+          {trafficDensity === "congested" && (
+            <>
+              <p className="text-lg text-gray-800 text-center">
+                Tình trạng giao thông:{" "}
+                <span className="font-bold text-gray-800">Ùn tắc</span>
+              </p>
+              <div className="w-full h-2 bg-red-500 !my-1"></div>
+            </>
+          )}
           {/* LUU THONG CHAM */}
-          <p className="text-lg text-gray-800 text-center">
-            Tình trạng giao thông:{" "}
-            <span className="font-bold text-gray-800">Lưu thông chậm</span>
-          </p>
-          <div className="w-full h-2 bg-yellow-500 !my-1"></div>
+          {trafficDensity === "normal" && (
+            <>
+              <p className="text-lg text-gray-800 text-center">
+                Tình trạng giao thông:{" "}
+                <span className="font-bold text-gray-800">Lưu thông chậm</span>
+              </p>
+              <div className="w-full h-2 bg-yellow-500 !my-1"></div>
+            </>
+          )}
           {/* THONG THOANG */}
-          {/* <p className="text-lg text-gray-800 text-center">
-            Tình trạng giao thông:{" "}
-            <span className="font-bold text-gray-800">Thông thoáng</span>
-          </p>
-          <div className="w-full h-2 bg-green-500 !my-1"></div> */}
+          {trafficDensity === "clear" && (
+            <>
+              <p className="text-lg text-gray-800 text-center">
+                Tình trạng giao thông:{" "}
+                <span className="font-bold text-gray-800">Thông thoáng</span>
+              </p>
+              <div className="w-full h-2 bg-green-500 !my-1"></div>
+            </>
+          )}
           <ul className="space-y-3">
             {trafficData.map((item, index) => (
               <li key={index} className="flex items-center">
@@ -447,7 +634,7 @@ const Flight = () => {
           </ul>
         </div>
       );
-    } else if (flightMethod === "damdongbatthuong") {
+    } else if (flightMethod === "people") {
       return (
         <div className="absolute z-3 top-40 right-[17px] bg-white border-2 border-red-400 opacity-90 rounded-lg shadow !p-4 w-45">
           <ul className="space-y-3">
@@ -456,32 +643,19 @@ const Flight = () => {
               {/* Larger icons */}
               <div>
                 <p className="font-medium text-gray-800">
-                  {crowdSenseData.label}: {crowdSenseData.count}
+                  {crowdSenseData.label}:{" "}
+                  {crowdSenseData.count >= 0 ? crowdSenseData.count : 0}
                 </p>
               </div>
             </li>
           </ul>
         </div>
       );
-    } else if (flightMethod === "damchay") {
+    } else if (flightMethod === "fire_smoke" || flightMethod === "tracking") {
       return null;
     } else {
       return null;
     }
-  };
-
-  // TODO
-  const convertCoordinates = async (
-    defectLatitude: number,
-    defectLongtitude: number
-  ) => {
-    const response = await axios.get(
-      `https://nominatim.openstreetmap.org/reverse?lat=${defectLatitude}&lon=${defectLongtitude}&format=json`
-    );
-    console.log("convertCoordinates: ", response);
-    console.log("convertCoordinatesName: ", response.data.display_name);
-    console.log("convertCoordinatesAddress: ", response.data.address);
-    return response.data.display_name;
   };
 
   const defectList = () => {
@@ -509,7 +683,7 @@ const Flight = () => {
         <div
           className={`absolute z-1 w-[350px] h-[calc(100%-64px-60px-82px)] 
             bg-white left-0 bottom-[30px] flex flex-col 
-            items-center overflow-y-auto rounded-r-[15px] ${
+            items-center overflow-y-auto rounded-r-[15px] !py-2 ${
               openDefectList
                 ? "opacity-100 transition-opacity duration-500 ease-in"
                 : "opacity-0"
@@ -517,7 +691,7 @@ const Flight = () => {
         >
           <div
             className="bg-red-500 text-white p-0.25 uppercase 
-                      text-center rounded-lg !mt-5.5 w-[95%] shadow-lg font-bold"
+            text-center rounded-lg w-[95%] shadow-lg font-bold"
           >
             <h1>BẤT THƯỜNG PHÁT HIỆN</h1>
           </div>
@@ -526,16 +700,13 @@ const Flight = () => {
               .slice()
               .reverse()
               .map((defect, index) => {
-                console.log(defect);
-                // const convertCoordinatesToExactLocation = convertCoordinates(
-                //   parseFloat(defect.defect_gis.latitude),
-                //   parseFloat(defect.defect_gis.longtitude)
-                // );
                 return (
                   <div
                     key={index}
-                    className="!mt-5.5 w-[95%] shadow-lg font-bold bg-white 
-                      text-black rounded-lg"
+                    className={`!mt-5.5 w-[95%] shadow-lg font-bold bg-white 
+                      text-black rounded-lg border border-gray-400 ${
+                        index === 0 ? "blink-red-border" : ""
+                      }`}
                   >
                     <div className="!p-2.5 uppercase">
                       <table>
@@ -546,17 +717,23 @@ const Flight = () => {
                           <td>
                             <p>{defect.defect_name}</p>
                           </td>
+                          {index === 0 && (
+                            <td className="flex justify-center items-center">
+                              <Icon path={mdiNewBox} size={1.5} color={"red"} />
+                            </td>
+                          )}
                         </tr>
                         <tr>
                           <td width={"30px"}>
                             <PinDropIcon style={{ color: "#00C8F8" }} />
                           </td>
                           <td>
-                            KD,VD: {parseFloat(defect.defect_gis.latitude)},{" "}
+                            TỌA ĐỘ: {parseFloat(defect.defect_gis.latitude)},{" "}
                             {parseFloat(defect.defect_gis.longtitude)}
                           </td>
                           <td>
                             <Button
+                              title="Copy tọa độ xảy ra lỗi"
                               onClick={() => {
                                 navigator.clipboard.writeText(
                                   `${parseFloat(
@@ -579,7 +756,7 @@ const Flight = () => {
                               color="blue"
                             />
                           </td>
-                          <td>ĐỊA CHỈ CHI TIẾT: Hà Đông</td>
+                          <td>ĐỊA CHỈ CHI TIẾT: {defect.defect_location}</td>
                         </tr>
                       </table>
                     </div>
@@ -615,27 +792,49 @@ const Flight = () => {
 
   return (
     <>
-      <Map
-        centerMap={centerMap}
-        zoomMap={zoomMap}
-        startFly={startFly || false}
-        currentLocation={currentLocation}
-        // polylineMap={polylineMap}
-        defectInfo={defectInfo}
-        mapCSS={"h-[195px] w-[400px] absolute z-1 bottom-0 right-0"}
-        // mapCSS={"hidden"} // hien tai dang de an an do khi bay do gps dang kp real gps
-      />
+      {!showVideoStreamOnly && (
+        <Map
+          centerMap={centerMap}
+          zoomMap={zoomMap}
+          startFly={startFly || false}
+          currentLocation={currentLocation}
+          // polylineMap={polylineMap}
+          defectInfo={defectInfo}
+          flightMethod={flightMethod}
+          mapCSS={"h-[195px] w-[400px] absolute z-1 bottom-0 right-0"}
+          // mapCSS={"hidden"} // hien tai dang de an an do khi bay do gps dang kp real gps
+        />
+      )}
 
       {setUpBeforeFly()}
 
-      {startFly && defectList()}
+      {startFly &&
+        !showVideoStreamOnly &&
+        flightMethod !== "tracking" &&
+        defectList()}
 
+      {/* TODO */}
       {startFly && devices.length > 0 && videoStreamUrl && (
-        <img
-          src={videoStreamUrl}
-          alt="Video detect stream"
-          className="w-full h-full"
-        />
+        <div className="relative w-screen h-[calc(100vh-55px)] flex justify-center items-center bg-gray-200">
+          {/* Video stream */}
+          <img
+            src={videoStreamUrl}
+            alt="Video detect stream"
+            className="w-[1280px] h-[720px] absolute"
+          />
+
+          {/* Canvas để vẽ */}
+          <canvas
+            ref={canvasRef}
+            width={1280}
+            height={720}
+            className="absolute cursor-crosshair"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onContextMenu={handleRightClick} // Xử lý nhấn chuột phải
+          />
+        </div>
       )}
 
       {startFly && (
@@ -647,17 +846,34 @@ const Flight = () => {
             const modifyDataSentToWS = {
               action: "off",
             };
-
+            setHasCalledVideoStreamApi(false);
             setVideoStreamUrl("");
             if (!ws || !ws.current) return;
             ws.current.send(JSON.stringify(modifyDataSentToWS));
           }}
         >
-          Dừng nhiệm vụ
+          Kết thúc kiểm tra
         </Button>
       )}
 
-      {startFly && <ObjectCount />}
+      {startFly && (
+        <button
+          className="absolute z-1 text-center normal-case 
+        shadow-[rgba(0,0,0,0.3)_0px_1px_4px_-1px] border-0 w-[40px] 
+        h-[40px] p-[10px] right-[16px] top-[70px] shadow-[0_2px_5px_rgba(0,0,0,0.15)] 
+        border-none bg-white rounded-[7px]"
+          title="Chỉ xem luồng video"
+          onClick={() => {
+            setShowVideoStreamOnly((prev) => (prev === true ? false : true));
+          }}
+        >
+          <CropFreeIcon color="action" />
+        </button>
+      )}
+
+      {startFly && !showVideoStreamOnly && <ObjectCount />}
+
+      {hadCompletedSetUpBeforeFly && <Loading />}
     </>
   );
 };
