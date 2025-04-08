@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GISDataType, DefectType } from "../../types/global/WSData.type";
 import {
   MapContainer,
@@ -28,11 +28,13 @@ interface MapProps {
   //   lng: number;
   // }[];
   defectInfo: DefectType[];
+  flightMethod: string;
   mapCSS: string;
 }
 
 interface SetCenterMapOnClickProps {
   coords: [number, number] | null;
+  triggerUpdate: string;
 }
 
 const Map = ({
@@ -42,12 +44,13 @@ const Map = ({
   currentLocation,
   // polylineMap,
   defectInfo,
+  flightMethod,
   mapCSS,
 }: MapProps) => {
   const [typeMap, setTypeMap] = useState("roadmap");
   const [buttonText, setButtonText] = useState("Bản đồ");
 
-  // console.log("polylineMap: ", polylineMap);
+  console.log("currentLocation: ", currentLocation);
   const customIcon = new L.Icon({
     iconUrl: DroneIcon,
     iconSize: [30, 30],
@@ -64,12 +67,17 @@ const Map = ({
     );
   };
 
-  const SetCenterMapOnClick = ({ coords }: SetCenterMapOnClickProps) => {
+  const SetCenterMapOnClick = ({
+    coords,
+    triggerUpdate,
+  }: SetCenterMapOnClickProps) => {
     const map = useMap();
-    if (coords) {
-      map.invalidateSize();
-      map.setView(coords, map.getZoom());
-    }
+    useEffect(() => {
+      if (coords) {
+        map.invalidateSize();
+        map.setView(coords, map.getZoom());
+      }
+    }, [coords, triggerUpdate, map]); // Thêm triggerUpdate vào dependencies
 
     return null;
   };
@@ -169,19 +177,23 @@ const Map = ({
         {buttonText}
       </button>
 
-      <button
-        className="absolute z-1 text-center normal-case 
+      {startFly && (
+        <>
+          <button
+            className="absolute z-1 text-center normal-case 
         shadow-[rgba(0,0,0,0.3)_0px_1px_4px_-1px] border-0 w-[40px] 
         h-[40px] p-[10px] right-[16px] top-[10px] shadow-[0_2px_5px_rgba(0,0,0,0.15)] 
         border-none bg-white rounded-[7px]"
-        onClick={() => {
-          setFullZoomMapCSS((prev) =>
-            prev === "h-[480px] w-[640px]" ? "" : "h-[480px] w-[640px]"
-          );
-        }}
-      >
-        <CropFreeIcon color="action" />
-      </button>
+            onClick={() => {
+              setFullZoomMapCSS((prev) =>
+                prev === "h-[480px] w-[640px]" ? "" : "h-[480px] w-[640px]"
+              );
+            }}
+          >
+            <CropFreeIcon color="action" />
+          </button>
+        </>
+      )}
 
       <MapContainer
         center={[centerMap.lat, centerMap.lng]}
@@ -193,8 +205,8 @@ const Map = ({
         <TileLayer
           url={
             typeMap === "roadmap"
-              ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
-              : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+                : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
           }
         />
 
@@ -213,7 +225,7 @@ const Map = ({
           )}
 
         {/* render loi */}
-        {renderMarkerError(defectInfo)}
+        {flightMethod !== "tracking" && renderMarkerError(defectInfo)}
 
         {/* set center map theo may bay */}
         {currentLocation &&
@@ -224,6 +236,7 @@ const Map = ({
                 parseFloat(currentLocation.latitude),
                 parseFloat(currentLocation.longtitude),
               ]}
+              triggerUpdate={fullZoomMapCSS} // Sử dụng fullZoomMapCSS làm trigger
             />
           )}
 
