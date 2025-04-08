@@ -18,6 +18,7 @@ import {
   // Select,
   TextField,
   Button,
+  Popover,
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 
@@ -26,6 +27,7 @@ import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import FolderIcon from "../../assets/images/open_folder.png";
 import MissionIcon from "../../assets/images/mission_drone_icon.svg";
 import CropFreeIcon from "@mui/icons-material/CropFree";
+import { ListCollapse } from "lucide-react";
 
 import ImageZoom from "../../components/Zooming/ImageZoom";
 
@@ -41,6 +43,7 @@ const ManageFlightData = () => {
   const [listImageByMission, setListImageByMission] = useState<
     SupervisionDetailsResponseType[]
   >([]);
+  console.log("listImageByMission: ", listImageByMission);
   // const [imageType, setImageType] = useState("all");
 
   // pagination
@@ -56,6 +59,17 @@ const ManageFlightData = () => {
   const [openZoomingImg, setOpenZoomingImg] = useState("");
 
   const location = useLocation();
+
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+  const open = Boolean(anchorEl);
+  const id = open ? "simple-popover" : undefined;
 
   // --------- Ham de xu ly chuyen trang pagination --------
   const handlePageChange = (
@@ -257,6 +271,47 @@ const ManageFlightData = () => {
                         openZoomingImg={openZoomingImg}
                         setOpenZoomingImg={setOpenZoomingImg}
                       />
+
+                      <Button
+                        className="!absolute top-[42px] left-0 z-3 !min-w-0 !w-15
+                        !h-10 !bg-white !border-none rounded-lg"
+                        variant="contained"
+                        aria-describedby={id}
+                        onClick={handleClick}
+                      >
+                        <ListCollapse size={24} color="gray" />
+                      </Button>
+                      <Popover
+                        id={id}
+                        open={open}
+                        anchorEl={anchorEl}
+                        onClose={handleClose}
+                        anchorOrigin={{
+                          vertical: "center",
+                          horizontal: "right",
+                        }}
+                      >
+                        <div className="w-[325px] h-[150px] !p-2">
+                          <ul className="list-disc list-outside !pl-5">
+                            <li>
+                              <span className="font-bold text-lg">GPS: </span>
+                              <span>{item.image_gis}</span>
+                            </li>
+                            <li>
+                              <span className="font-bold text-lg">
+                                Cảnh báo:{" "}
+                              </span>
+                              <span>{item.image_title} </span>
+                            </li>
+                            <li>
+                              <span className="font-bold text-lg">
+                                Địa chỉ:{" "}
+                              </span>
+                              <span>{item.image_location}</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </Popover>
 
                       <img
                         className="w-full h-full rounded-lg"
