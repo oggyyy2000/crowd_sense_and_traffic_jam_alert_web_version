@@ -61,15 +61,19 @@ const ManageFlightData = () => {
   const location = useLocation();
 
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
-  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
+  const handleClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    index: number
+  ) => {
     setAnchorEl(event.currentTarget);
+    setOpenPopoverIndex(index);
   };
 
   const handleClose = () => {
     setAnchorEl(null);
+    setOpenPopoverIndex(null);
   };
-  const open = Boolean(anchorEl);
-  const id = open ? "simple-popover" : undefined;
 
   // --------- Ham de xu ly chuyen trang pagination --------
   const handlePageChange = (
@@ -276,14 +280,16 @@ const ManageFlightData = () => {
                         className="!absolute top-[42px] left-0 z-3 !min-w-0 !w-15
                         !h-10 !bg-white !border-none rounded-lg"
                         variant="contained"
-                        aria-describedby={id}
-                        onClick={handleClick}
+                        aria-describedby={`popover-${index}`}
+                        onClick={(e) => handleClick(e, index)}
                       >
                         <ListCollapse size={24} color="gray" />
                       </Button>
+
                       <Popover
-                        id={id}
-                        open={open}
+                        key={index}
+                        id={`popover-${index}`}
+                        open={openPopoverIndex === index}
                         anchorEl={anchorEl}
                         onClose={handleClose}
                         anchorOrigin={{
