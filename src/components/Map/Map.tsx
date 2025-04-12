@@ -202,11 +202,22 @@ const Map = ({
         maxZoom={17}
         className="absolute h-full w-full z-0"
       >
+        {/* using map offline */}
+        {/* 
+          <TileLayer
+            url={
+              typeMap === "roadmap"
+                  ? "file:///home/orin/OSM_offline_data/arcgis_roadmap_full_and_NorthVN_zoom_0_16/{z}_{y}_{x}.png"
+                  : "file:///home/orin/OSM_offline_data/arcgis_satelite_full_and_NorthVN_zoom_0_16/{z}_{y}_{x}.png"
+            }
+          />
+         */}
+
         <TileLayer
           url={
             typeMap === "roadmap"
-                ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
-                : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+              : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
           }
         />
 
