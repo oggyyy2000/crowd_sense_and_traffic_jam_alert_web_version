@@ -11,36 +11,36 @@ const ObjectCountPanel = ({
   trafficDensity,
 }: ObjectCountPanelProps) => {
   const trafficData = [
-    {
-      icon: "👤",
-      label: "người",
-      count: objCount && objCount.people >= 0 ? objCount.people : 0,
-    },
-    {
-      icon: "🚲",
-      label: "xe đạp",
-      count: objCount && objCount.bicycle >= 0 ? objCount.bicycle : 0,
-    },
+    // {
+    //   icon: "👤",
+    //   label: "người",
+    //   count: objCount && objCount.people >= 0 ? objCount.people : 0,
+    // },
+    // {
+    //   icon: "🚲",
+    //   label: "xe đạp",
+    //   count: objCount && objCount.bicycle >= 0 ? objCount.bicycle : 0,
+    // },
     {
       icon: "🚗",
       label: "ô tô",
       count: objCount && objCount.car >= 0 ? objCount.car : 0,
     },
-    {
-      icon: "🚚",
-      label: "xe tải",
-      count: objCount && objCount.truck >= 0 ? objCount.truck : 0,
-    },
-    {
-      icon: "🛺",
-      label: "xe ba bánh",
-      count: objCount && objCount.tricycle >= 0 ? objCount.tricycle : 0,
-    },
-    {
-      icon: "🚌",
-      label: "xe buýt",
-      count: objCount && objCount.bus >= 0 ? objCount.bus : 0,
-    },
+    // {
+    //   icon: "🚚",
+    //   label: "xe tải",
+    //   count: objCount && objCount.truck >= 0 ? objCount.truck : 0,
+    // },
+    // {
+    //   icon: "🛺",
+    //   label: "xe ba bánh",
+    //   count: objCount && objCount.tricycle >= 0 ? objCount.tricycle : 0,
+    // },
+    // {
+    //   icon: "🚌",
+    //   label: "xe buýt",
+    //   count: objCount && objCount.bus >= 0 ? objCount.bus : 0,
+    // },
     {
       icon: "🏍️",
       label: "xe máy",

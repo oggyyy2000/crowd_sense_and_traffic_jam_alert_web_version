@@ -93,11 +93,11 @@ const Flight = () => {
   console.log("defectInfo: ", defectInfo);
   const [objCount, setObjCount] = useState<CountObjectType>({
     people: 0,
-    bicycle: 0,
+    // bicycle: 0,
     car: 0,
-    truck: 0,
-    tricycle: 0,
-    bus: 0,
+    // truck: 0,
+    // tricycle: 0,
+    // bus: 0,
     motor: 0,
   });
   const [trafficDensity, setTrafficDensity] = useState("");
@@ -204,11 +204,11 @@ const Flight = () => {
             setDefectInfo([]);
             setObjCount({
               people: 0,
-              bicycle: 0,
+              // bicycle: 0,
               car: 0,
-              truck: 0,
-              tricycle: 0,
-              bus: 0,
+              // truck: 0,
+              // tricycle: 0,
+              // bus: 0,
               motor: 0,
             });
             setTrafficDensity("");

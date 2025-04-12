@@ -14,11 +14,11 @@ export interface DefectType {
 
 export interface CountObjectType {
   people: number;
-  bicycle: number;
+  // bicycle: number;
   car: number;
-  truck: number;
-  tricycle: number;
-  bus: number;
+  // truck: number;
+  // tricycle: number;
+  // bus: number;
   motor: number;
 }
 
